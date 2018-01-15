@@ -126,13 +126,14 @@ void setup() {
   initMPU9250();
   float magCalibration[3];
   initAK8963(magCalibration);
-  setupBlueToothConnection();
+  //setupBlueToothConnection();
+  Serial.begin(9600);
 }
 
 void loop() {
-  if (ser.available()){
+  if (Serial.available()){
     
-    if(ser.read()=='b'){
+    if(Serial.read()=='b'){
       //Serial.println("hello");
       getRawData();
     }
@@ -145,10 +146,10 @@ void getRawData(){
   readGyroData(gyroCount);
   readMagData(magCount);
 
-  ser.print("b");ser.print(";");
-  ser.print(accelCount[0]);ser.print("/");ser.print(accelCount[1]);ser.print("/");ser.print(accelCount[2]);ser.print(";");
-  ser.print(gyroCount[0]);ser.print("/");ser.print(gyroCount[1]);ser.print("/");ser.print(gyroCount[2]);ser.print(";");
-  ser.print(magCount[0]);ser.print("/");ser.print(magCount[1]);ser.print("/");ser.print(magCount[2]);ser.println(";");
+  Serial.print("b");Serial.print(";");
+  Serial.print(accelCount[0]);Serial.print("/");Serial.print(accelCount[1]);Serial.print("/");Serial.print(accelCount[2]);Serial.print(";");
+  Serial.print(gyroCount[0]);Serial.print("/");Serial.print(gyroCount[1]);Serial.print("/");Serial.print(gyroCount[2]);Serial.print(";");
+  Serial.print(magCount[0]);Serial.print("/");Serial.print(magCount[1]);Serial.print("/");Serial.print(magCount[2]);Serial.println(";");
   }
 
 void writeByte(uint8_t address, uint8_t subAddress, uint8_t data)

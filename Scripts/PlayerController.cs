@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Text;
 using System.Collections;
 using System.IO.Ports;
 
@@ -7,22 +6,26 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+    private float[,] orb;
+    //private float[] rpos = {0,0,0};
+    //private float x=0,y=0,z=0,vx=0,vy=0,vz=0;
     private Rigidbody rb;
-    Vector3 origin,newPos;
+    private Quaternion orientation;
+    Vector3 origin;
     SerialPort sp;
-    string textMAG,textACC,textGYRO,textMi,textMa;
-    int trials = 0;
-    float speed;
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
         origin = rb.position;
-        sp = new SerialPort("\\\\.\\COM4", 9600);
+        
+        orb = new float[,] { {1,0,0},{0,1,0},{0,0,1} };
+        
+        sp = new SerialPort("COM3", 9600);
         if (!sp.IsOpen)
         {
             sp.Open();
-            sp.ReadTimeout = 500;
+            sp.ReadTimeout = 50;
             sp.Handshake = Handshake.None;
             if (sp.IsOpen) { print("Open"); }
             
@@ -34,19 +37,16 @@ public class PlayerController : MonoBehaviour
         rb.position = origin;
     }
 
-    void Update()
+    void FixedUpdate()
     {
+        
         float[] data;
-
+        
         float r = Input.GetAxis("Cancel");
-        float[] lastRot = {0,0,0};
-        float[] minData = {0,0,0,0,0,0,0,0,0};
-        float[] maxData = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
         if (!sp.IsOpen)
-        {   trials++;
+        {   
             sp.Open();
-            print(trials);
         }
         if (r != 0.0f)
         {
@@ -57,59 +57,101 @@ public class PlayerController : MonoBehaviour
         if (sp.IsOpen)
         {
             //print("SP is OPEN");
-            sp.Write("b");
-            data = ProcData();
-            for (int i=6;i<9;i+=1) {
-                if (data[i] > maxData[i]) {
-                    maxData[i] = data[i];
-                }
-                if (data[i]>minData[i]) {
-                    minData[i] = data[i];
-                }
+            //sp.Write("b");
+            
+            data = ParseData();
+            UpdateOrb(data[3],data[4],data[5]);
+            /*if (data[0]>0.2f) {
+                vx = vx + data[0];
+                x = x + vx + ((data[0] * data[0]) / 2);
             }
-            for (int k=6;k<9;k+=1) {
-                textMi+=(minData[k].ToString())+":";
-            }
-            for (int k = 6; k < 9; k += 1)
-            {
-                textMa += (maxData[k].ToString()) + ":";
-            }
-            textMAG = "MagDATA: " + data[6].ToString() + ":" + data[7].ToString() + ":" + data[8].ToString();
-            textACC = "AccelDATA: " + data[0].ToString() + ":" + data[1].ToString() + ":" + data[2].ToString();
-            textGYRO = "GyroDATA: "+data[3].ToString()+":"+data[4].ToString()+":"+data[5].ToString();
-            /*transform.Rotate(
-                data[6] - lastRot[0],
-                data[7] - lastRot[1],
-                data[8] - lastRot[2],
-                Space.Self
-                );*/
-            lastRot[0] = data[6];
-            lastRot[1] = data[7];
-            lastRot[2] = data[8];
+            if (data[2] > 0.2f){
+                vz = vz + data[2];
+                z = z + vz + ((data[2] * data[2]) / 2);
+            }*/
+            
 
         }
 
     }
 
-    private void OnGUI()
-    {
-        textMAG=GUI.TextField(new Rect(10, 10, 200, 20), textMAG);
-        textACC = GUI.TextField(new Rect(200, 30, 400, 40), textACC);
-        textGYRO = GUI.TextField(new Rect(400, 50, 600, 60), textGYRO);
+    private Quaternion dirCosToQuat(float[,]dC) {
+        float q0, q1, q2, q3, d;
+        Quaternion ret;
+        q3 = 0.5f * Mathf.Sqrt(dC[0, 0] + dC[1, 1]+ dC[2, 2] + 1);
+        q0 = (dC[1, 2] - dC[2, 1]) / (4 * q3);
+        q1 = (dC[2, 0] - dC[0, 2]) / (4 * q3);
+        q2 = (dC[0, 1] - dC[1, 0]) / (4 * q3);
+        d = Mathf.Sqrt((q0*q0)+(q1*q1)+(q2*q2)+(q3*q3));
+        q0 = (q0 / d);
+        q1 = (q1 / d);
+        q2 = (q2 / d);
+        q3 = (q3 / d);
+        ret = new Quaternion(q0, q1, q2, q3);
+        return ret;
     }
 
+    private float[,] MatrixMul(float[,] a, float[,] b) {
+        float[,] ret = {{0,0,0},{0,0,0},{0,0,0}};
+        ret[0, 0] = a[0, 0] * b[0, 0] + a[0, 1] * b[1, 0] + a[0, 2] * b[2, 0];
+        ret[0, 2] = a[0, 0] * b[0, 1] + a[0, 1] * b[1, 1] + a[0, 2] * b[2, 1];
+        ret[0, 1] = a[0, 0] * b[0, 2] + a[0, 1] * b[1, 2] + a[0, 2] * b[2, 2];
+
+
+        ret[0, 0] = a[1, 0] * b[0, 0] + a[1, 1] * b[1, 0] + a[1, 2] * b[2, 0];
+        ret[0, 2] = a[1, 0] * b[0, 1] + a[1, 1] * b[1, 1] + a[1, 2] * b[2, 1];
+        ret[0, 1] = a[1, 0] * b[0, 2] + a[1, 1] * b[1, 2] + a[1, 2] * b[2, 2];
+
+        ret[0, 0] = a[2, 0] * b[0, 0] + a[2, 1] * b[1, 0] + a[2, 2] * b[2, 0];
+        ret[0, 2] = a[2, 0] * b[0, 1] + a[2, 1] * b[1, 1] + a[2, 2] * b[2, 1];
+        ret[0, 1] = a[2, 0] * b[0, 2] + a[2, 1] * b[1, 2] + a[2, 2] * b[2, 2];
+        return ret;
+    }
+
+    private void UpdateOrb(float x, float y, float z){
+        Quaternion q;
+        float[,] b = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
+        float[,] I = {{1,0,0}, {0,1,0}, {0,0,1}};
+        b[0, 1] = -z * Time.deltaTime;
+        b[0, 2] = y * Time.deltaTime;
+        b[1, 0] = z * Time.deltaTime;
+        b[1, 2] = -x * Time.deltaTime;
+        b[2, 0] = -y * Time.deltaTime;
+        b[2, 1] = x * Time.deltaTime;
+
+        float sigma = Mathf.Sqrt((x * x) * (y * y) * (z * z))*Time.deltaTime;
+
+        I[0, 0] += ((Mathf.Sin(sigma)) / sigma) * b[0, 0] + ((1 - Mathf.Cos(sigma)) / (sigma * sigma)) * (b[0, 0] * b[0, 0]);
+        I[0, 1] += ((Mathf.Sin(sigma)) / sigma) * b[0, 1] + ((1 - Mathf.Cos(sigma)) / (sigma * sigma)) * (b[0, 1] * b[0, 1]);
+        I[0, 2] += ((Mathf.Sin(sigma)) / sigma) * b[0, 2] + ((1 - Mathf.Cos(sigma)) / (sigma * sigma)) * (b[0, 2] * b[0, 2]);
+
+        I[1, 0] += ((Mathf.Sin(sigma)) / sigma) * b[1, 0] + ((1 - Mathf.Cos(sigma)) / (sigma * sigma)) * (b[1, 0] * b[1, 0]);
+        I[1, 1] += ((Mathf.Sin(sigma)) / sigma) * b[1, 1] + ((1 - Mathf.Cos(sigma)) / (sigma * sigma)) * (b[1, 1] * b[1, 1]);
+        I[1, 2] += ((Mathf.Sin(sigma)) / sigma) * b[1, 2] + ((1 - Mathf.Cos(sigma)) / (sigma * sigma)) * (b[1, 2] * b[1, 2]);
+    
+        I[2, 0] += ((Mathf.Sin(sigma)) / sigma) * b[2, 0] + ((1 - Mathf.Cos(sigma)) / (sigma * sigma)) * (b[2, 0] * b[2, 0]);
+        I[2, 1] += ((Mathf.Sin(sigma)) / sigma) * b[2, 1] + ((1 - Mathf.Cos(sigma)) / (sigma * sigma)) * (b[2, 1] * b[2, 1]);
+        I[2, 2] += ((Mathf.Sin(sigma)) / sigma) * b[2, 2] + ((1 - Mathf.Cos(sigma)) / (sigma * sigma)) * (b[2, 2] * b[2, 2]);
+
+        orb = MatrixMul(orb,I);
+        q = dirCosToQuat(orb);
+        print(q.x+" "+q.y+" "+q.z+" "+q.w);
+        rb.rotation = q;
+    }
 
     private void OnApplicationQuit()
     {
         sp.Close();
     }
-    private float[] ProcData() {
+
+    private float[] ParseData() {
         float[] data = {0, 0, 0, 0, 0, 0, 0, 0, 0}, intaccel= {0, 0, 0},intgyro = {0, 0, 0}, intmagno = {0, 0, 0};
+        string rawdata="";
         string[] splitdata,accel,gyro,magno;
         if (sp.IsOpen)
         {
             sp.Write("b");
-            string rawdata = sp.ReadLine();
+            rawdata = sp.ReadLine();
             splitdata = rawdata.Split(';');
             accel = splitdata[1].Split('/');
             gyro = splitdata[2].Split('/');
@@ -146,6 +188,7 @@ public class PlayerController : MonoBehaviour
              data[8] = intmagno[2];
             
         }
+        
         return data;
     }
 }
