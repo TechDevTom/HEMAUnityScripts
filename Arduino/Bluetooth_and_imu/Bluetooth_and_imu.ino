@@ -92,7 +92,7 @@ float temperature;
 float SelfTest[6];
 
 
-SoftwareSerial ser(7, 6); // RX, TX
+SoftwareSerial ser(6, 7); // RX, TX
 int BluetoothData; // the data given from Computer
 float AccelResult;
 float AccelScale=16384;
@@ -273,11 +273,12 @@ void setupBlueToothConnection()
   delay(400); 
 
   ser.print("AT+DEFAULT");             // Restore all setup value to factory setup
-  delay(2000); /*
+  delay(2000); 
   
   
-  ser.print("AT+NAMESeeedBTSlave");    // set the bluetooth name as "SeeedBTSlave" ,the length of bluetooth name must less than 12 characters.
+  ser.print("AT+NAMEFederuino");    // set the bluetooth name as "SeeedBTSlave" ,the length of bluetooth name must less than 12 characters.
   delay(400);
+  /*
   
     ser.print("AT+PIN1234");             // set the pair code to connect 
   delay(400);
