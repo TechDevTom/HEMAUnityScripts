@@ -14,23 +14,25 @@ public class PlayerController : MonoBehaviour
     private Quaternion orientation;
     Vector3 origin;
     SerialPort sp;
+    bool setup = false;
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
         origin = rb.position;
-        
+        String portname="COM3";
+
         orb = new float[,] { {1,0,0},{0,1,0},{0,0,1} };
         v = new float[] { 0, 0, 0 };
         p = new float[] { 0, 0, 0 };
 
-        sp = new SerialPort("////.//COM4", 9600);
+        sp = new SerialPort(portname, 9600);
         if (!sp.IsOpen)
         {
             sp.Open();
             sp.ReadTimeout = 50;
             sp.Handshake = Handshake.None;
-            if (sp.IsOpen) { print("Open"); }
+            if (sp.IsOpen) { setup = true; }
             
         }
     }
@@ -49,8 +51,9 @@ public class PlayerController : MonoBehaviour
 
         float r = Input.GetAxis("Cancel");
 
-        if (!sp.IsOpen)
-        {   
+        if (!setup)
+        {
+            sp = getPort();
             sp.Open();
         }
         if (r != 0.0f)
@@ -82,6 +85,49 @@ public class PlayerController : MonoBehaviour
 
         }
 
+    }
+
+    private SerialPort getPort() {
+        SerialPort sp;
+        String portname="COM3";
+        if (Input.GetAxis("port1") != 0.0f)
+        {
+            portname = "COM1";
+        }
+        if (Input.GetAxis("port2") != 0.0f)
+        {
+            portname = "COM2";
+        }
+        if (Input.GetAxis("port3") != 0.0f)
+        {
+            portname = "COM3";
+        }
+        if (Input.GetAxis("port4") != 0.0f)
+        {
+            portname = "////.//COM4";
+        }
+        if (Input.GetAxis("port5") != 0.0f)
+        {
+            portname = "COM5";
+        }
+        if (Input.GetAxis("port6") != 0.0f)
+        {
+            portname = "COM6";
+        }
+        if (Input.GetAxis("port7") != 0.0f)
+        {
+            portname = "COM7";
+        }
+        if (Input.GetAxis("port8") != 0.0f)
+        {
+            portname = "COM8";
+        }
+        if (Input.GetAxis("port9") != 0.0f)
+        {
+            portname = "COM9";
+        }
+        sp = new SerialPort(portname, 9600);
+        return sp;
     }
 
     private void UpdatePos(float x, float y, float z) {
