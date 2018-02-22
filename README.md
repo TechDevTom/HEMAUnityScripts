@@ -26,10 +26,13 @@ __Scripts__ - Folder containing all .cs script files
 * SystemController.cs
 * PlayerController.cs
 * OpponentController.cs
+* GhostSwordController.cs
+* MovementCreatorController.cs
 
 __Scenes__ - Folder containing all .unity scene files
 * StartMenu.unity
 * TrainingScenario.unity
+* CreateMovement.unity
 
 __Arduino__ - Folder containing all .ino files
 * Bluetooth_and_imu.ino
