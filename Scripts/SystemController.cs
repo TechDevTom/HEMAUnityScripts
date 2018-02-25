@@ -1,16 +1,31 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
 public class SystemController : MonoBehaviour {
+
+    public Text text;
 
     public void Awake()
     {
         Application.targetFrameRate = 60; //Cap the engine at 60 frames per second, to allow better use of Update()
     }
 
+    public void LoadMovementLevel(string name)
+    {
+        PlayerPrefs.SetString("name", text.text);
+        LoadLevel(name);
+    }
+
     public void LoadLevel(string name)
+    {
+        Debug.Log("New Level load: " + name);
+        SceneManager.LoadScene(name);
+    }
+
+    public static void StaticLoadLevel(string name)
     {
         Debug.Log("New Level load: " + name);
         SceneManager.LoadScene(name);

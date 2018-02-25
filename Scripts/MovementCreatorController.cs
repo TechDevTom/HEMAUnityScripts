@@ -13,129 +13,98 @@ public class MovementCreatorController : MonoBehaviour {
     private GameObject startSword;
     private GameObject endSword;
 
+    private string movementName;
+    private int movementCount;
+
     private Queue<Transform> steadyChecker;
     private Queue<Transform> recordingSampler;
+    private float recordStartTime;
 
-    private struct Record
+    private class Record
     {
         public Vector3 position;
         public Quaternion rotation;
+        public float time;
 
-        public Record(Vector3 v, Quaternion q)
+        public Record(Vector3 v, Quaternion q, float t)
         {
             position = v;
             rotation = q;
+            time = t;
         }
     }
 
     private Queue<Record> officialRecording;
+    private Queue<Queue<Record>> officialRecordings;
 
     private bool firstPassStarted;
     private bool firstPassFinished;
+    private bool extraPassStarted;
+    private bool extraPassFinished;
 
-   private int steadyFrameCount;
+    private int steadyFrameCount;
+    private int steadyDegreeVariation;
+    private int steadyPositionVariation;
+    private int recordingSampleKeepCount;
+    private int recordingSampleDiscardCount;
+    
 
-
-    // Use this for initialization
-    void Start () {
+    public void Awake()
+    {
         steadyChecker = new Queue<Transform>();
 
         recordingSampler = new Queue<Transform>();
         officialRecording = new Queue<Record>();
+        officialRecordings = new Queue<Queue<Record>>();
+
+        if (string.IsNullOrEmpty(PlayerPrefs.GetString("name")))
+            movementName = "noInputName";
+        else
+            movementName = PlayerPrefs.GetString("name");
+
+        movementCount = 0;
 
         firstPassStarted = false;
         firstPassFinished = false;
+        extraPassStarted = false;
+        extraPassFinished = false;
 
-        //Increase or decrease to set time before "steady"
-        steadyFrameCount = Application.targetFrameRate * 4;
+        //-- Here lie the magic numbers --//
 
-        /*
-        
-         --- create start location indicator ---
-        startSword = Instantiate(sword);
-        startSword.name = "startSword";
-        startSword.AddComponent<GhostSwordController>().sword = startSword;
-        
-         --- create end location indicator ---
-        endSword = Instantiate(sword);
-        endSword.name = "endSword";
-        endSword.AddComponent<GhostSwordController>().sword = endSword;
-        
-         */
+        //Frames before potentially "steady"
+        steadyFrameCount = Application.targetFrameRate * 2;
+
+        //Acceptable variation in degrees before "steady"
+        steadyDegreeVariation = 10;
+
+        //Acceptable variation in position before "steady"
+        steadyPositionVariation = 10;
+
+        //Trailing position tracker count for averaging sword position
+        recordingSampleKeepCount = 30;
+
+        //Number of trailing position tracking points to discard upon successful averaging
+        recordingSampleDiscardCount = 10;
+
+        //Cap the engine at 60 frames per second, to allow better use of Update()
+        Application.targetFrameRate = 60; 
     }
 
-
-    //Some code from: https://support.unity3d.com/hc/en-us/articles/115000341143-How-do-I-read-and-write-data-from-a-text-file-
-    private void persistMovement()
-    {
-        string path = "Assets/Resources/test.txt";
-
-        //Write some text to the test.txt file
-        StreamWriter writer = new StreamWriter(path, false);
-        while(officialRecording.Count > 0)
-        {
-            Record r = officialRecording.Dequeue();
-            writer.WriteLine(r.position.ToString() + r.rotation.ToString());
-        }
-        writer.Close();
-
-
-        //This is just to prove it's working, not to remain in the persist call
-
-        //Re-import the file to update the reference in the editor
-        AssetDatabase.ImportAsset(path);
-        TextAsset asset = (TextAsset) Resources.Load("test");
-
-        //Print the text from the file
-        Debug.Log(asset.text);
-    }
-
-    // Update is called once per frame
+     // Update is called once per frame
     void Update () {
 
-        /*
-         
-        while (position is not stable) { 
-            if(position is stable) {
-                render beginning position
-                indicate to user 
-                break while
-            }
-         }
-         while (position is not stable) {
-            record position
-            if(position is stable) {
-                render end position
-                indicate to user 
-                break while
-            }         
-         }
+        if (Input.GetKeyDown("escape"))
+            completeCreationAndExit();
 
-        store inputs
-        
-        while (position is not stable) { 
-            if(position is stable and in beginning position) {
-                indicate to user 
-                break while
-            }
-         }
-         while (position is not stable) {
-            record position
-            if(position is stable and in end position) {
-                indicate to user 
-                break while
-            }         
-         }
-
-         */
 
         bool stable = isStable();
-
+        
         if(!firstPassStarted)
         {
             if(stable)
             {
                 firstPassStarted = true;
+                recordStartTime = Time.time;
 
                 Text txt = label.GetComponent<Text>();
                 txt.text = "Recording";
@@ -150,68 +119,247 @@ public class MovementCreatorController : MonoBehaviour {
         {
             if(!firstPassFinished)
             {
-                if(!stable)
+                //This is where first recording happens
+                if (!stable)
                 {
-                    //This is where first recording happens
 
                     recordingSampler.Enqueue(sword.transform);
 
-                    if(recordingSampler.Count >= 30)
+                    if(recordingSampler.Count >= recordingSampleKeepCount)
                     {
-                        //Get average position of last 30 frames
-                        Transform[] sampleArray = recordingSampler.ToArray();
-                        Vector3[] forPositionAveraging = new Vector3[sampleArray.Length];
-                        for (int i = 0; i < sampleArray.Length; i++)
-                        {
-                            forPositionAveraging[i] = sampleArray[i].position;
-                        }
-                        Vector3 truePosition = getMeanVector(forPositionAveraging);
-
-
-                        //Get average rotation of last 30 frames
-                        Quaternion[] forRotationAveraging = new Quaternion[sampleArray.Length];
-                        for (int i = 0; i < sampleArray.Length; i++)
-                        {
-                            forRotationAveraging[i] = sampleArray[i].rotation;
-                        }
-                        Quaternion trueRotation = getMeanQuaternion(forRotationAveraging);
-                        
-                        while(recordingSampler.Count >= 15)
-                        {
-                            recordingSampler.Dequeue();
-                        }
-
-                        //Add the compiled position and rotation to the official recording log
-                        officialRecording.Enqueue(new Record(truePosition, trueRotation));
-
+                        processMovementToRecord();
                     } 
                 
 
                 } else
                 {
+                    recordingSampler.Clear();
                     firstPassFinished = true;
+                    persistMovement();
 
                     Text txt = label.GetComponent<Text>();
                     txt.text = "Movement Locked";
-
-
+                    
                     //Render end position
                     endSword = Instantiate(sword);
                     endSword.name = "endSword";
                     endSword.AddComponent<GhostSwordController>().sword = endSword;
-
-                    persistMovement();
+                    
 
                 }
             } else
             {
-                //This is where the multiple passes will go
 
+                if (!extraPassStarted)
+                {
+                    //extra pass hasn't started, wait for starting position
+
+                    if(stable && isAtStartPosition(sword.transform))
+                    {
+                        extraPassStarted = true;
+                        recordStartTime = Time.time;
+
+                        Text txt = label.GetComponent<Text>();
+                        txt.text = "Movement Locked: Recording Additional Input #" + movementCount;
+                    }
+                } else
+                {
+                    //extra pass in progress, record inputs
+                    //if in end position, flip extraPassFinished and tell user
+
+                    if (!extraPassFinished)
+                    {
+                        if(!stable)
+                        {
+
+                            recordingSampler.Enqueue(sword.transform);
+
+                            if (recordingSampler.Count >= recordingSampleKeepCount)
+                            {
+                                processMovementToRecord();
+                            }
+
+                        } else
+                        { 
+                            if (isAtEndPosition(sword.transform))
+                            {
+                                recordingSampler.Clear();
+                                extraPassFinished = true;
+
+                                Text txt = label.GetComponent<Text>();
+                                txt.text = "Movement Locked: Additional Input #" + movementCount + " Recorded";
+                                persistMovement();
+                            }
+                        }
+
+                    } else
+                    {
+                        //extra passs finished, reset
+                        extraPassStarted = false;
+                        extraPassFinished = false;
+                    }
+                }
             }
         }
         
     }
 
+    //Some code from: https://support.unity3d.com/hc/en-us/articles/115000341143-How-do-I-read-and-write-data-from-a-text-file-
+    private void persistMovement()
+    {
+        Queue<Record> duplicateRecording = new Queue<Record>();
+        foreach (Record r in officialRecording)
+        {
+            duplicateRecording.Enqueue(r);
+        }
+        officialRecordings.Enqueue(duplicateRecording);
+        officialRecording.Clear();
+        movementCount++;
+    }
+
+    private void completeCreationAndExit()
+    {
+        float averageTime = 0;
+        int sampleCount = 0;
+
+        //Get average time across all recordings
+        foreach (Queue<Record> q in officialRecordings)
+        {
+            averageTime += q.ToArray()[q.Count - 1].time;
+            sampleCount++;
+        }
+        averageTime = averageTime / sampleCount;
+
+        //Standardize all recordings to the sample time
+        float sampleTime;
+        foreach (Queue<Record> q in officialRecordings)
+        {
+            sampleTime = q.ToArray()[q.Count - 1].time;
+            foreach (Record r in q)
+            {
+                r.time *= (averageTime / sampleTime);
+            }
+        }
+
+        //Get average number of samples
+        float averageSamples = 0;
+        foreach (Queue<Record> q in officialRecordings)
+        {
+            averageSamples += q.Count;
+        }
+        averageSamples = averageSamples / sampleCount;
+
+        int binCount = (int)System.Math.Floor(averageSamples);
+        float binSize = averageTime / binCount;
+
+        int currentBin = 0;
+        List<Record> toAverage = new List<Record>();
+        Queue<Record> completedRecords = new Queue<Record>();
+
+        while (currentBin * binSize < averageTime)
+        {
+            foreach (Queue<Record> q in officialRecordings)
+            {
+                foreach (Record r in q)
+                {
+                    //If the current record lies within the current bin
+                    float currentBinMin = currentBin * binSize;
+                    if (r.time >= currentBinMin && r.time < (currentBinMin + binSize))
+                    {
+                        toAverage.Add(r);
+                    }
+
+                }
+            }
+            //First bin (t = 0 -> binSize) always comes up empty, but this is without moving test data, this conditional may not be necessary with the proper data
+            if (toAverage.Count != 0)
+            {
+                completedRecords.Enqueue(averageRecord(toAverage.ToArray()));
+            }
+            currentBin++;
+            toAverage.Clear();
+        }
+
+        string path = "Assets/Resources/" + movementName + "/";
+        string fullPath = "Assets/Resources/" + movementName + "/" + movementName + ".txt";
+
+        if (!Directory.Exists(path))
+        {
+            Directory.CreateDirectory(path);
+        }
+
+        //Write some text to file
+        StreamWriter writer = new StreamWriter(fullPath, false);
+        writer.WriteLine(binSize + "," + currentBin);
+        while (completedRecords.Count > 0)
+        {
+            Record r = completedRecords.Dequeue();
+            writer.WriteLine(r.position.ToString() + r.rotation.ToString() + r.time);
+        }
+        writer.Close();
+
+        SystemController.StaticLoadLevel("Start Menu");
+    }
+
+    //Return the average record of all the passed in records
+    Record averageRecord(Record[] records)
+    {
+
+        Vector3[] forPositionAveraging = new Vector3[records.Length];
+        for (int i = 0; i < records.Length; i++)
+        {
+            forPositionAveraging[i] = records[i].position;
+        }
+        Vector3 truePosition = getMeanVector(forPositionAveraging);
+        
+        Quaternion[] forRotationAveraging = new Quaternion[records.Length];
+        for (int i = 0; i < records.Length; i++)
+        {
+            forRotationAveraging[i] = records[i].rotation;
+        }
+        Quaternion trueRotation = getMeanQuaternion(forRotationAveraging);
+
+        float averageTime = 0;
+        int count = 0;
+        for (int i = 0; i < records.Length; i++)
+        {
+            averageTime += records[i].time;
+            count++;
+        }
+
+        return new Record(truePosition, trueRotation, (averageTime/count));
+    }
+
+    //Creates a record based on the last few frames of movement
+    void processMovementToRecord()
+    {
+        //Get average position of last 30 frames
+        Transform[] sampleArray = recordingSampler.ToArray();
+        Vector3[] forPositionAveraging = new Vector3[sampleArray.Length];
+        for (int i = 0; i < sampleArray.Length; i++)
+        {
+            forPositionAveraging[i] = sampleArray[i].position;
+        }
+        Vector3 truePosition = getMeanVector(forPositionAveraging);
+
+
+        //Get average rotation of last 30 frames
+        Quaternion[] forRotationAveraging = new Quaternion[sampleArray.Length];
+        for (int i = 0; i < sampleArray.Length; i++)
+        {
+            forRotationAveraging[i] = sampleArray[i].rotation;
+        }
+        Quaternion trueRotation = getMeanQuaternion(forRotationAveraging);
+
+        while (recordingSampler.Count >= recordingSampleDiscardCount)
+        {
+            recordingSampler.Dequeue();
+        }
+
+        //Add the compiled position and rotation to the official recording log
+        officialRecording.Enqueue(new Record(truePosition, trueRotation, (Time.time - recordStartTime)));
+
+    }
 
     //From: https://answers.unity.com/questions/164257/find-the-average-of-10-vectors.html
     Vector3 getMeanVector(Vector3[] positions)
@@ -228,6 +376,40 @@ public class MovementCreatorController : MonoBehaviour {
             z += pos.z;
         }
         return new Vector3(x / positions.Length, y / positions.Length, z / positions.Length);
+    }
+
+    bool isAtStartPosition(Transform currentPos)
+    {
+        bool atStart = true;
+        atStart = areTransformsSimilar(startSword.transform, currentPos);
+        return atStart;
+    }
+
+    bool isAtEndPosition(Transform currentPos)
+    {
+        bool atStart = true;
+        atStart = areTransformsSimilar(endSword.transform, currentPos);
+        return atStart;
+    }
+
+    bool areTransformsSimilar(Transform t1, Transform t2)
+    {
+        bool similar = true;
+
+
+        if (Quaternion.Angle(t1.rotation, t2.rotation) > steadyDegreeVariation)
+        {
+            //The angle between some pair of the last steadyFrameCount sword positions is greater than steadyDegreeVariation degrees
+            similar = false;
+        }
+        if (Vector3.Distance(t1.position, t2.position) > steadyPositionVariation)
+        {
+            //The distance between some pair of the last steadyFrameCount sword positions is greater than steadyPositionVariation (units unknown)
+            similar = false;
+        }
+
+        return similar;
+
     }
 
     //Returns true if the sword object has remained mostly stable for the past 30 frames (0.5 seconds at 60fps), will only return true up to once every (steadyFrameCount/framerate) seconds, false otherwise
@@ -253,16 +435,7 @@ public class MovementCreatorController : MonoBehaviour {
         {
             for (int j = i + 1; j < steadyChecker.Count; j++)
             {
-                if (Quaternion.Angle(steadyChecker.ToArray()[i].rotation, steadyChecker.ToArray()[j].rotation) > 10)
-                {
-                    isStable = false;
-                    //The angle between some pair of the last 30 sword positions is greater than 10 degrees
-                }
-                if (Vector3.Distance(steadyChecker.ToArray()[i].position, steadyChecker.ToArray()[j].position) > 10) 
-                {
-                    isStable = false;
-                    //The distance between some pair of the last 30 sword positions is greater than 10 (units unknown)
-                }
+                isStable = areTransformsSimilar(steadyChecker.ToArray()[i], steadyChecker.ToArray()[j]);
             }
         }
 

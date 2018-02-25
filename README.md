@@ -34,6 +34,7 @@ __Scenes__ - Folder containing all .unity scene files
 * StartMenu.unity
 * TrainingScenario.unity
 * CreateMovement.unity
+* MovementNameInput.unity
 
 __Resources__ - Folder containing exported movement .txt files
 * test.txt
