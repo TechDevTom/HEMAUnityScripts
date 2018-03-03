@@ -28,6 +28,7 @@ __Scripts__ - Folder containing all .cs script files
 * OpponentController.cs
 * GhostSwordController.cs
 * MovementCreatorController.cs
+* MovementReader.cs
 * Math3d.cs
 
 __Scenes__ - Folder containing all .unity scene files
@@ -35,6 +36,7 @@ __Scenes__ - Folder containing all .unity scene files
 * TrainingScenario.unity
 * CreateMovement.unity
 * MovementNameInput.unity
+* MovementLoader.unity
 
 __Resources__ - Folder containing exported movement .txt files
 * test.txt

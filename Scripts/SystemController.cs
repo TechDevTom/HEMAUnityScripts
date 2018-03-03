@@ -3,10 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using System.IO;
 
 public class SystemController : MonoBehaviour {
 
     public Text text;
+
+    public GameObject notification;
 
     public void Awake()
     {
@@ -41,6 +44,21 @@ public class SystemController : MonoBehaviour {
     {
         Debug.Log("Quit requested");
         Application.Quit();
+    }
+
+    public void AttemptMovementLoad()
+    {
+        string fullPath = "Assets/Resources/" + text.text + ".txt";
+
+        if (!File.Exists(fullPath))
+        {
+            Text txt = notification.GetComponent<Text>();
+            txt.text = text.text + ".txt is not a valid HEMA movement file!";
+        } else
+        {
+            PlayerPrefs.SetString("name", text.text);
+            SceneManager.LoadScene("TrainingScenario");
+        }
     }
 
 }

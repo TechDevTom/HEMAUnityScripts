@@ -20,7 +20,7 @@ public class MovementCreatorController : MonoBehaviour {
     private Queue<Transform> recordingSampler;
     private float recordStartTime;
 
-    private class Record
+    public class Record
     {
         public Vector3 position;
         public Quaternion rotation;
@@ -280,21 +280,31 @@ public class MovementCreatorController : MonoBehaviour {
             toAverage.Clear();
         }
 
-        string path = "Assets/Resources/" + movementName + "/";
-        string fullPath = "Assets/Resources/" + movementName + "/" + movementName + ".txt";
+
+
+        string path = "Assets/Resources/";
+        string fullPath = "Assets/Resources/" + movementName + ".txt";
 
         if (!Directory.Exists(path))
         {
             Directory.CreateDirectory(path);
         }
 
-        //Write some text to file
+
         StreamWriter writer = new StreamWriter(fullPath, false);
         writer.WriteLine(binSize + "," + currentBin);
+
+        //Write start postion to file
+        writer.WriteLine(startSword.transform.position.ToString() + "|" + startSword.transform.rotation.ToString());
+
+        //Write end postion to file
+        writer.WriteLine(endSword.transform.position.ToString() + "|" + endSword.transform.rotation.ToString());
+
+        //Write recorded checkpoints to file
         while (completedRecords.Count > 0)
         {
             Record r = completedRecords.Dequeue();
-            writer.WriteLine(r.position.ToString() + r.rotation.ToString() + r.time);
+            writer.WriteLine(r.position.ToString() + "|" + r.rotation.ToString() + "|" + r.time);
         }
         writer.Close();
 
